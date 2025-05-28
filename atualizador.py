@@ -14,6 +14,15 @@ class AutomatedUpdateGUI:
         self.root.title("Sistema de Atualização Automatizado")
         self.root.geometry("1100x750")
         self.root.configure(bg='#e0e0e0')
+
+        # Define o caminho para o arquivo de log
+        if getattr(sys, 'frozen', False):
+            # Se estiver rodando como um executável PyInstaller
+            application_path = os.path.dirname(sys.executable)
+        else:
+            # Se estiver rodando como um script .py
+            application_path = os.path.dirname(os.path.abspath(__file__))
+        self.log_file_path = os.path.join(application_path, "log.txt")
         
         # Variáveis para os caminhos
         self.pasta_atualizacao = tk.StringVar(value="Atualizacao") 
@@ -25,7 +34,8 @@ class AutomatedUpdateGUI:
         self.setup_styles()
         self.create_widgets()
         self.center_window()
-    
+        self.log_message("Interface gráfica iniciada e log de arquivo configurado.", "info") # Log inicial
+
     def setup_styles(self):
         style = ttk.Style()
         style.theme_use('clam') # 'clam', 'alt', 'default', 'classic'
@@ -140,18 +150,18 @@ class AutomatedUpdateGUI:
         
         self.log_text = scrolledtext.ScrolledText(log_frame_outer, 
                                                  height=10, 
-                                                 font=('Consolas', 10), # Slightly larger log font
+                                                 font=('Consolas', 10), 
                                                  wrap=tk.WORD,
-                                                 bg='#ffffff', # White background for log
-                                                 fg='#000000') # Black text
+                                                 bg='#ffffff', 
+                                                 fg='#000000') 
         self.log_text.pack(fill='both', expand=True)
         
-        self.log_text.tag_configure('success', foreground='#008000', font=('Consolas', 10, 'bold')) # Dark Green
-        self.log_text.tag_configure('warning', foreground='#FF8C00', font=('Consolas', 10, 'bold')) # Dark Orange
-        self.log_text.tag_configure('error', foreground='#CC0000', font=('Consolas', 10, 'bold'))   # Dark Red
-        self.log_text.tag_configure('info', foreground='#00008B')    # Dark Blue
-        self.log_text.tag_configure('critical', foreground='#800080', font=('Consolas', 10, 'bold'))# Purple
-        self.log_text.tag_configure('detail', foreground='#505050') # Dark Gray
+        self.log_text.tag_configure('success', foreground='#008000', font=('Consolas', 10, 'bold')) 
+        self.log_text.tag_configure('warning', foreground='#FF8C00', font=('Consolas', 10, 'bold')) 
+        self.log_text.tag_configure('error', foreground='#CC0000', font=('Consolas', 10, 'bold'))   
+        self.log_text.tag_configure('info', foreground='#00008B')    
+        self.log_text.tag_configure('critical', foreground='#800080', font=('Consolas', 10, 'bold'))
+        self.log_text.tag_configure('detail', foreground='#505050') 
         self.log_text.tag_configure('header', foreground='#000000', font=('Consolas', 10, 'bold', 'underline'))
 
     def center_window(self):
@@ -168,28 +178,43 @@ class AutomatedUpdateGUI:
             var.set(folder)
             self.log_message(f"Pasta '{folder_name}' definida para: {folder}", 'info')
 
-    def log_message(self, message, tag='info'): # Default tag to 'info'
+    def log_message(self, message, tag='info'): 
         timestamp = datetime.now().strftime('%d/%m/%Y %H:%M:%S')
-        # Indent subsequent lines for better readability of multi-line messages if any
-        formatted_message = message.replace("\n", "\n" + " " * (len(timestamp) + 3))
-        full_message = f"[{timestamp}] {formatted_message}\n"
+        formatted_message_gui = message.replace("\n", "\n" + " " * (len(timestamp) + 3)) # For GUI indentation
+        full_message_for_gui = f"[{timestamp}] {formatted_message_gui}\n"
         
-        self.log_text.insert(tk.END, full_message, tag)
+        # Log to GUI
+        self.log_text.insert(tk.END, full_message_for_gui, tag)
         self.log_text.see(tk.END) 
-        self.root.update_idletasks() 
+        
+        # Log to file (plain text, timestamp included)
+        # For file, use the original message structure with timestamp but without extra spaces for GUI indent
+        full_message_for_file = f"[{timestamp}] {message}\n"
+        try:
+            with open(self.log_file_path, 'a', encoding='utf-8') as f_log:
+                f_log.write(full_message_for_file)
+        except Exception as e:
+            # If file logging fails, log this error to the GUI
+            # Avoid calling log_message again here to prevent potential infinite loop if file error persists
+            gui_error_msg = f"[{timestamp}] !!! CRITICAL: Falha ao escrever no arquivo de log ({self.log_file_path}): {str(e)} !!!\n"
+            self.log_text.insert(tk.END, gui_error_msg, 'error')
+            self.log_text.see(tk.END)
+            
+        self.root.update_idletasks()
 
     def clear_log(self):
         user_confirmation = messagebox.askyesno("Limpar Log", 
-                                                "Tem certeza que deseja limpar todo o log de operações?\n"
-                                                "Isso também reiniciará as listas de arquivos identificados e ações planejadas.",
+                                                "Tem certeza que deseja limpar todo o log de operações na tela?\n"
+                                                "Isso também reiniciará as listas de arquivos identificados e ações planejadas.\n"
+                                                "O arquivo 'log.txt' não será afetado.",
                                                 icon='question')
         if user_confirmation:
             self.log_text.delete(1.0, tk.END)
             self.progs_identified_files = []
             self.planned_actions_etapa2 = []
             self.btn_etapa2.config(state='disabled')
-            self.log_message("Log limpo pelo usuário. Listas de arquivos e ações reiniciadas.", "info")
-            self.status_var.set("Log limpo. Pronto para Etapa 1.")
+            self.log_message("Log da tela limpo pelo usuário. Listas de arquivos e ações reiniciadas.", "info")
+            self.status_var.set("Log da tela limpo. Pronto para Etapa 1.")
 
     def validate_paths_and_prepare(self):
         pasta_atualizacao_val = self.pasta_atualizacao.get().strip()
@@ -197,22 +222,25 @@ class AutomatedUpdateGUI:
         
         if not pasta_atualizacao_val or not pasta_progs_val:
             messagebox.showerror("Erro de Validação", "Por favor, informe os caminhos para as pastas 'Atualizacao' e 'PROGS'.")
+            self.log_message("Erro de Validação: Caminhos para 'Atualizacao' ou 'PROGS' não informados.", "error")
             return False
         
         if not os.path.exists(pasta_atualizacao_val):
             messagebox.showerror("Erro de Validação", f"Pasta 'Atualizacao' não encontrada:\n{pasta_atualizacao_val}")
+            self.log_message(f"Erro de Validação: Pasta 'Atualizacao' não encontrada: {pasta_atualizacao_val}", "error")
             return False
         
         if not os.path.exists(pasta_progs_val):
             messagebox.showerror("Erro de Validação", f"Pasta 'PROGS' não encontrada:\n{pasta_progs_val}")
+            self.log_message(f"Erro de Validação: Pasta 'PROGS' não encontrada: {pasta_progs_val}", "error")
             return False
+        self.log_message("Validação de caminhos concluída com sucesso.", "info")
         return True
 
     def set_buttons_state_during_operation(self, is_operating):
         state = 'disabled' if is_operating else 'normal'
         self.btn_etapa1.config(state=state)
         
-        # Etapa 2 button logic: enable only if Etapa 1 completed and not currently operating
         if not is_operating and self.progs_identified_files:
              self.btn_etapa2.config(state='normal')
         else:
@@ -220,11 +248,7 @@ class AutomatedUpdateGUI:
         
         self.btn_clear_log.config(state=state)
         self.btn_finalize.config(state=state)
-        # Keep path entries and browse buttons enabled unless explicitly decided otherwise
-        # self.entry_atualizacao.config(state=state) 
-        # self.entry_progs.config(state=state)
 
-    # --- Etapa 1: Identificação de Arquivos ---
     def start_etapa1_identification(self):
         if not self.validate_paths_and_prepare():
             return
@@ -270,10 +294,11 @@ class AutomatedUpdateGUI:
             self.progress_bar.stop()
             self.set_buttons_state_during_operation(False)
 
-    # --- Etapa 2: Comparar e Atualizar ---
     def start_etapa2_update(self):
         if not self.progs_identified_files:
-            messagebox.showwarning("Aviso - Etapa 2", "Nenhum arquivo foi identificado na Etapa 1. Execute a Etapa 1 primeiro.")
+            msg = "Nenhum arquivo foi identificado na Etapa 1. Execute a Etapa 1 primeiro."
+            messagebox.showwarning("Aviso - Etapa 2", msg)
+            self.log_message(f"Aviso Etapa 2: {msg}", "warning")
             return
         if not self.validate_paths_and_prepare(): 
             return
@@ -308,7 +333,7 @@ class AutomatedUpdateGUI:
                 
                 self.log_message(f"Analisando: {progs_file_path.name} (em {relative_path.parent})", 'detail')
 
-                if not atualizacao_file_path.exists(): # Rule 3 (part 2)
+                if not atualizacao_file_path.exists(): 
                     self.log_message(f"  -> Ignorado: Arquivo correspondente NÃO ENCONTRADO em 'Atualizacao': {atualizacao_file_path}.", 'detail')
                     continue
 
@@ -318,18 +343,17 @@ class AutomatedUpdateGUI:
                 date_progs_str = datetime.fromtimestamp(mtime_progs).strftime('%d/%m/%Y %H:%M:%S')
                 date_atualizacao_str = datetime.fromtimestamp(mtime_atualizacao).strftime('%d/%m/%Y %H:%M:%S')
 
-                if mtime_atualizacao == mtime_progs: # Rule 5
+                if mtime_atualizacao == mtime_progs: 
                     if self.verbose_var.get():
                         self.log_message(f"  -> Datas de modificação IGUAIS para '{progs_file_path.name}'. Nenhuma ação.", 'info')
                         self.log_message(f"     PROGS: {date_progs_str}, Atualizacao: {date_atualizacao_str}", 'detail')
                     continue
-                elif mtime_atualizacao < mtime_progs: # Rule 7
+                elif mtime_atualizacao < mtime_progs: 
                     self.log_message(f"  -> ALERTA: Versão em 'Atualizacao' de '{progs_file_path.name}' é MAIS ANTIGA. Nenhuma substituição será feita.", 'error')
                     self.log_message(f"     PROGS: {date_progs_str} (mais recente)", 'error')
                     self.log_message(f"     Atualizacao: {date_atualizacao_str} (mais antiga)", 'error')
                     continue
                 
-                # Rule 6: mtime_atualizacao > mtime_progs (Atualizacao is newer)
                 self.log_message(f"  -> ATUALIZAÇÃO NECESSÁRIA para '{progs_file_path.name}'. Versão em 'Atualizacao' é MAIS RECENTE.", 'warning')
                 self.log_message(f"     PROGS: {date_progs_str} (será atualizado)", 'warning')
                 self.log_message(f"     Atualizacao: {date_atualizacao_str} (mais recente)", 'warning')
@@ -355,7 +379,6 @@ class AutomatedUpdateGUI:
 
             self.log_message(f"Total de arquivos que precisam de atualização: {len(self.planned_actions_etapa2)}", 'critical')
             self.status_var.set("Etapa 2: Análise concluída. Aguardando confirmação para atualizar...")
-            # Schedule confirmation dialog in main thread
             self.root.after(0, self._request_update_confirmation_dialog)
 
         except Exception as e:
@@ -387,7 +410,6 @@ class AutomatedUpdateGUI:
         if user_confirmed:
             self.status_var.set("Etapa 2: Confirmação recebida. Iniciando execução das atualizações...")
             self.log_message("CONFIRMAÇÃO DO USUÁRIO: Atualização autorizada.", 'critical')
-            # Start execution phase in a new thread
             execution_thread = threading.Thread(target=self.run_etapa2_execution_phase, daemon=True)
             execution_thread.start()
         else:
@@ -413,11 +435,9 @@ class AutomatedUpdateGUI:
                 self.log_message(f"Processando atualização para: '{original_filename}' em '{target_dir}'", 'info')
 
                 try:
-                    # 6.1: Remover arquivos antigos da mesma aplicação com sufixos de data ou com "old" no nome.
                     self.log_message(f"  Passo 6.1: Verificando e removendo arquivos antigos para '{original_filename}'...", 'detail')
                     self._remove_legacy_files_step_6_1(target_dir, base_name, extension)
 
-                    # 6.2: Renomear o arquivo atual da PROGS, adicionando a data atual do sistema no nome. (Backup)
                     if self.backup_var.get():
                         if progs_file_path.exists(): 
                             self.log_message(f"  Passo 6.2: Criando backup de '{original_filename}'...", 'detail')
@@ -427,11 +447,9 @@ class AutomatedUpdateGUI:
                     else:
                         self.log_message(f"  Passo 6.2: Backup automático desabilitado. O arquivo '{original_filename}' será sobrescrito diretamente se existir.", 'detail')
 
-
-                    # 6.3: Copiar o novo arquivo da Atualizacao para a pasta correspondente da PROGS
                     self.log_message(f"  Passo 6.3: Copiando nova versão de '{original_filename}' de 'Atualizacao' para 'PROGS'...", 'detail')
                     target_dir.mkdir(parents=True, exist_ok=True) 
-                    shutil.copy2(str(atualizacao_file_path), str(target_dir / original_filename)) # copy2 preserves metadata
+                    shutil.copy2(str(atualizacao_file_path), str(target_dir / original_filename)) 
                     
                     self.log_message(f"  -> SUCESSO: '{original_filename}' atualizado com sucesso.", 'success')
                     arquivos_atualizados_count += 1
@@ -450,7 +468,6 @@ class AutomatedUpdateGUI:
                           f"✅ Arquivos atualizados com sucesso: {arquivos_atualizados_count}\n" \
                           f"❌ Erros encontrados durante a operação: {erros_count}"
             
-            # Show final summary in main thread
             self.root.after(0, lambda: messagebox.showinfo(summary_title, summary_msg) if erros_count == 0 else messagebox.showwarning(summary_title, summary_msg))
 
         except Exception as e:
@@ -463,36 +480,21 @@ class AutomatedUpdateGUI:
             self.set_buttons_state_during_operation(False)
             self.planned_actions_etapa2 = [] 
 
-
     def _remove_legacy_files_step_6_1(self, target_dir: Path, base_name_to_update: str, extension_to_update: str):
-        """
-        Step 6.1: Remover arquivos antigos da mesma aplicação com sufixos de data ou com "old" no nome.
-        Ex: C:\PROGS\Gerar Disco NFP\
-             ├── GerarDiscoNFP.exe  (este é o base_name_to_update, não será removido aqui)
-             └── GerarDiscoNFP20042025.exe (REMOVER)
-             └── old_GerarDiscoNFP.exe (REMOVER)
-        """
         files_removed_count = 0
-        # Regex for DDMMYYYY or YYYYMMDD or similar date patterns (6 to 8 digits)
-        # Ensure it's a suffix to the base_name_to_update
         date_suffix_pattern = re.compile(rf"^{re.escape(base_name_to_update)}(\d{{6,8}})$", re.IGNORECASE)
         old_prefix_pattern = re.compile(rf"^old_{re.escape(base_name_to_update)}.*$", re.IGNORECASE)
 
         for item in target_dir.iterdir():
             if item.is_file() and item.suffix.lower() == extension_to_update.lower():
-                # Check if it's the exact file being updated; if so, skip (it's handled by backup/overwrite)
                 if item.name.lower() == (base_name_to_update + extension_to_update).lower():
                     continue
 
-                item_stem_lower = item.stem.lower()
-                base_name_lower = base_name_to_update.lower()
-
                 should_remove = False
-                # Check for date suffix: GerarDiscoNFP20042025
-                if date_suffix_pattern.match(item.stem): # item.stem already excludes extension
+                reason = ""
+                if date_suffix_pattern.match(item.stem):
                     should_remove = True
                     reason = "sufixo de data"
-                # Check for "old" prefix: old_GerarDiscoNFP or old_GerarDiscoNFP_v1
                 elif old_prefix_pattern.match(item.stem):
                     should_remove = True
                     reason = "prefixo 'old_'"
@@ -508,26 +510,17 @@ class AutomatedUpdateGUI:
         if files_removed_count == 0:
             self.log_message(f"     Nenhum arquivo legado (com data/old) correspondente a '{base_name_to_update+extension_to_update}' encontrado para remoção.", 'detail')
 
-
     def _backup_file_with_date_step_6_2(self, progs_file_path: Path):
-        """
-        Step 6.2: Renomear o arquivo atual da PROGS, adicionando a data atual do sistema no nome.
-        Ex: Antes: C:\PROGS\App\App.exe  
-            Depois: C:\PROGS\App\AppDDMMAAAA.exe (onde DDMMAAAA é a data atual)
-        """
         directory = progs_file_path.parent
         base_name = progs_file_path.stem
         extension = progs_file_path.suffix
-        
-        current_date_str = datetime.now().strftime('%d%m%Y') # Format DDMMAAAA
-        
-        # Construct the new backup name: fileDDMMAAAA.ext
+        current_date_str = datetime.now().strftime('%d%m%Y')
         backup_base_name_with_date = f"{base_name}{current_date_str}"
         new_backup_name = f"{backup_base_name_with_date}{extension}"
         new_backup_path = directory / new_backup_name
         
         counter = 1
-        while new_backup_path.exists(): # Handle collisions for backups on the same day if run multiple times
+        while new_backup_path.exists(): 
             new_backup_name = f"{backup_base_name_with_date}_{counter}{extension}"
             new_backup_path = directory / new_backup_name
             counter += 1
@@ -537,32 +530,40 @@ class AutomatedUpdateGUI:
             self.log_message(f"     Backup criado: '{progs_file_path.name}' renomeado para '{new_backup_path.name}'", 'success')
         except Exception as e:
             self.log_message(f"     ERRO ao criar backup para '{progs_file_path.name}' como '{new_backup_path.name}': {e}", 'error')
-            raise # Re-raise to be caught by the main execution loop for error counting
-
+            raise 
 
 def resource_path(relative_path):
     """Retorna o caminho para o recurso, mesmo se estiver embutido no .exe"""
     try:
         base_path = sys._MEIPASS  # Criado automaticamente pelo PyInstaller
     except AttributeError:
-        base_path = os.path.dirname(__file__)
+        base_path = os.path.dirname(os.path.abspath(__file__)) # Use absolute path for script context
     return os.path.join(base_path, relative_path)
 
 def main():
     root = tk.Tk()
     try:
         icon_path = resource_path("icon.ico")
-        root.iconbitmap("icon.ico")
-    except:
+        if os.path.exists(icon_path):
+             # Use default=icon_path on Windows to set icon for app and child windows (like dialogs)
+            root.iconbitmap(default=icon_path)
+        # else: # Icon not found, will use default Tk icon. No explicit error message needed unless debugging.
+        #     print(f"Debug: Icon not found at {icon_path}") # Optional: for debugging
+    except tk.TclError:
+        # This can happen if the icon file is corrupted or not a valid .ico format for Tk
+        # print("Debug: TclError setting icon - possibly invalid icon format or missing.") # Optional
+        pass 
+    except Exception as e:
+        # Catch any other unexpected error during icon setting
+        # print(f"Debug: An unexpected error occurred while setting icon: {e}") # Optional
         pass
-    # Set a modern theme if available (Windows example)
+
     if os.name == 'nt':
         try:
-            from tkinter import ttk
             s = ttk.Style()
-            s.theme_use('vista') # or 'xpnative'
+            s.theme_use('vista') 
         except ImportError:
-            pass # ttk not available or theme not found
+            pass 
     app = AutomatedUpdateGUI(root)
     root.mainloop()
 
