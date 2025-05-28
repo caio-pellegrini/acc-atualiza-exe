@@ -6,6 +6,7 @@ from datetime import datetime
 from pathlib import Path
 import threading
 import re
+import sys
 
 class AutomatedUpdateGUI:
     def __init__(self, root):
@@ -538,8 +539,22 @@ class AutomatedUpdateGUI:
             self.log_message(f"     ERRO ao criar backup para '{progs_file_path.name}' como '{new_backup_path.name}': {e}", 'error')
             raise # Re-raise to be caught by the main execution loop for error counting
 
+
+def resource_path(relative_path):
+    """Retorna o caminho para o recurso, mesmo se estiver embutido no .exe"""
+    try:
+        base_path = sys._MEIPASS  # Criado automaticamente pelo PyInstaller
+    except AttributeError:
+        base_path = os.path.dirname(__file__)
+    return os.path.join(base_path, relative_path)
+
 def main():
     root = tk.Tk()
+    try:
+        icon_path = resource_path("icon.ico")
+        root.iconbitmap("icon.ico")
+    except:
+        pass
     # Set a modern theme if available (Windows example)
     if os.name == 'nt':
         try:
