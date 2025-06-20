@@ -117,25 +117,34 @@ class AutomatedUpdateGUI:
         btn_remove_ignore = ttk.Button(ignore_buttons_frame, text="Remover", style='Small.TButton', command=self.remove_ignore_folder)
         btn_remove_ignore.pack(side='left', expand=True, fill='x', padx=(2,0))
         
-        options_frame = ttk.LabelFrame(left_pane, text="Opções de Atualização", padding="10")
+        options_frame = ttk.LabelFrame(left_pane, text="Opções", padding="10")
         options_frame.pack(fill='x', pady=(0, 10), anchor='n')
         
         self.backup_var = tk.BooleanVar(value=True)
-        self.create_backup_check = ttk.Checkbutton(options_frame, text="Backup antes de sobrescrever arquivos", variable=self.backup_var)
+        self.create_backup_check = ttk.Checkbutton(options_frame, text="Criar backup automático", variable=self.backup_var)
         self.create_backup_check.pack(anchor='w', pady=(0,2))
-        ttk.Label(options_frame, text="Renomeia o arquivo atual em PROGS para 'arquivoDDMMAAAA' antes de copiar o novo.", style='Instruction.TLabel').pack(anchor='w', padx=(20,0), pady=(0,5))
+        
+        # --- NOVO: Checkbox para Log Verboso ---
+        self.verbose_var = tk.BooleanVar(value=True)
+        self.verbose_check = ttk.Checkbutton(options_frame, text="Log Detalhado (Verboso)", variable=self.verbose_var)
+        self.verbose_check.pack(anchor='w', pady=(5,2))
+
 
         action_buttons_frame = ttk.LabelFrame(left_pane, text="Fluxo de Execução Controlado", padding="10")
-        action_buttons_frame.pack(fill='both', expand=True, pady=(0, 10), anchor='n')
+        action_buttons_frame.pack(fill='x', pady=(0, 10), anchor='n')
 
-        self.btn_step1 = ttk.Button(action_buttons_frame, text="Etapa 1 - Identificar Arquivos", style='Main.TButton', command=self.start_step1_identification)
-        self.btn_step1.pack(fill='x', pady=5)
+        action_buttons_frame.columnconfigure(0, weight=1)
+        action_buttons_frame.columnconfigure(1, weight=1)
+        action_buttons_frame.columnconfigure(2, weight=1)
+
+        self.btn_step1 = ttk.Button(action_buttons_frame, text="1. Identificar", style='Main.TButton', command=self.start_step1_identification)
+        self.btn_step1.grid(row=0, column=0, sticky='ew', padx=(0, 2), pady=5)
         
-        self.btn_step2 = ttk.Button(action_buttons_frame, text="Etapa 2 - Comparar Arquivos", style='Main.TButton', command=self.start_step2_comparison, state='disabled')
-        self.btn_step2.pack(fill='x', pady=5)
+        self.btn_step2 = ttk.Button(action_buttons_frame, text="2. Comparar", style='Main.TButton', command=self.start_step2_comparison, state='disabled')
+        self.btn_step2.grid(row=0, column=1, sticky='ew', padx=2, pady=5)
 
-        self.btn_step3 = ttk.Button(action_buttons_frame, text="Etapa 3 - Executar Atualização", style='Critical.TButton', command=self.start_step3_execution, state='disabled')
-        self.btn_step3.pack(fill='x', pady=5)
+        self.btn_step3 = ttk.Button(action_buttons_frame, text="3. Executar", style='Critical.TButton', command=self.start_step3_execution, state='disabled')
+        self.btn_step3.grid(row=0, column=2, sticky='ew', padx=(2, 0), pady=5)
 
         bottom_frame = ttk.Frame(left_pane)
         bottom_frame.pack(fill='x', side='bottom', pady=(10,0))
@@ -221,7 +230,7 @@ class AutomatedUpdateGUI:
 
     def log_message(self, message, tag='info'):
         timestamp = datetime.now().strftime('%d/%m/%Y %H:%M:%S')
-        full_message_for_gui = f"[{timestamp}] {message.replace(os.linesep, f'{os.linesep}[{timestamp}] ')}\n"
+        full_message_for_gui = f"[{timestamp}] {message.replace(os.linesep, f'{os.linesep}           ')}\n"
         self.log_text.insert(tk.END, full_message_for_gui, tag)
         self.log_text.see(tk.END)
         try:
@@ -244,16 +253,22 @@ class AutomatedUpdateGUI:
 
     def toggle_ui_state(self, is_operating):
         state = 'disabled' if is_operating else 'normal'
+        
+        # Control main action buttons
         self.btn_step1.config(state=state)
-        # Sequencialmente habilita os botões
         self.btn_step2.config(state='disabled' if is_operating or not self.identified_files else 'normal')
         self.btn_step3.config(state='disabled' if is_operating or not self.planned_actions else 'normal')
         
-        for child in (self.root.winfo_children()):
-             if isinstance(child, (ttk.Frame, ttk.LabelFrame)):
-                for widget in child.winfo_children():
-                    if isinstance(widget, (ttk.Button, ttk.Entry, tk.Listbox, ttk.Checkbutton)) and widget not in [self.btn_step1, self.btn_step2, self.btn_step3, self.btn_finalize]:
-                        widget.config(state=state)
+        # Control other interactive widgets
+        for widget in [self.entry_progs, self.entry_atualizacao, self.ignore_listbox, self.create_backup_check, self.verbose_check]:
+            widget.config(state=state)
+        
+        # Find all buttons in frames and disable them, except for the main flow
+        for frame in [self.root, self.entry_progs.master, self.ignore_listbox.master.master]:
+            for child in frame.winfo_children():
+                if isinstance(child, ttk.Button) and child not in [self.btn_step1, self.btn_step2, self.btn_step3, self.btn_finalize, self.btn_clear_log]:
+                     child.config(state=state)
+
 
     # --- ETAPA 1: IDENTIFICATION ---
     def start_step1_identification(self):
@@ -277,7 +292,10 @@ class AutomatedUpdateGUI:
                     continue
                 for filename in files:
                     if filename.lower().endswith(('.exe', '.dll')):
-                        self.identified_files.append(os.path.join(root, filename))
+                        full_path = os.path.join(root, filename)
+                        self.identified_files.append(full_path)
+                        if self.verbose_var.get():
+                            self.log_message(f"   Encontrado: {full_path}", 'detail')
             
             self.log_message(f"Etapa 1 concluída. Total de arquivos encontrados: {len(self.identified_files)}", 'success')
             self.status_var.set(f"Etapa 1 concluída. {len(self.identified_files)} arquivo(s) pronto(s) para comparação.")
@@ -310,9 +328,28 @@ class AutomatedUpdateGUI:
                 try:
                     relative_path = progs_path.relative_to(base_progs)
                     atualizacao_path = base_atualizacao / relative_path
-                    if atualizacao_path.exists() and atualizacao_path.stat().st_mtime > progs_path.stat().st_mtime:
+                    
+                    if not atualizacao_path.exists():
+                        continue
+
+                    mtime_progs = progs_path.stat().st_mtime
+                    mtime_atualizacao = atualizacao_path.stat().st_mtime
+                    
+                    if mtime_atualizacao > mtime_progs:
                         self.planned_actions.append({'source': str(atualizacao_path), 'dest': str(progs_path)})
                         self.log_message(f"-> Planejada atualização para: {progs_path.name}", 'warning')
+                        if self.verbose_var.get():
+                            date_progs_str = datetime.fromtimestamp(mtime_progs).strftime('%d/%m/%Y %H:%M:%S')
+                            date_atualizacao_str = datetime.fromtimestamp(mtime_atualizacao).strftime('%d/%m/%Y %H:%M:%S')
+                            self.log_message(f"   Caminho: {progs_path}", 'detail')
+                            self.log_message(f"   PROGS: {date_progs_str} | Atualizacao: {date_atualizacao_str}", 'detail')
+                    
+                    elif self.verbose_var.get() and mtime_atualizacao < mtime_progs:
+                        date_progs_str = datetime.fromtimestamp(mtime_progs).strftime('%d/%m/%Y %H:%M:%S')
+                        date_atualizacao_str = datetime.fromtimestamp(mtime_atualizacao).strftime('%d/%m/%Y %H:%M:%S')
+                        self.log_message(f"-> ALERTA: Versão em 'Atualizacao' de '{progs_path.name}' é MAIS ANTIGA.", 'error')
+                        self.log_message(f"   PROGS: {date_progs_str} | Atualizacao: {date_atualizacao_str}", 'detail')
+
                 except ValueError:
                     self.log_message(f"ERRO: {progs_path} não está em {base_progs}.", "error")
 
