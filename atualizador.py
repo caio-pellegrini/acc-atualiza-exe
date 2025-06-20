@@ -79,22 +79,23 @@ class AutomatedUpdateGUI:
         
         paths_frame = ttk.LabelFrame(left_pane, text="Pastas de Entrada", padding="10")
         paths_frame.pack(fill='x', pady=(0, 15))
-        
-        ttk.Label(paths_frame, text="Pasta 'Atualizacao':", font=('Segoe UI', 9, 'bold')).grid(row=0, column=0, sticky='w', pady=(0,2))
-        ttk.Label(paths_frame, text="(Contém os arquivos mais recentes para atualizar)", style='Instruction.TLabel').grid(row=1, column=0, columnspan=2, sticky='w', pady=(0,5))
-        self.entry_atualizacao = ttk.Entry(paths_frame, textvariable=self.pasta_atualizacao, width=35)
-        self.entry_atualizacao.grid(row=2, column=0, sticky='ew', padx=(0, 5))
-        btn_browse_atualizacao = ttk.Button(paths_frame, text="Procurar...", style='Standard.TButton', command=lambda: self.browse_folder(self.pasta_atualizacao, "Atualização"))
-        btn_browse_atualizacao.grid(row=2, column=1, sticky='e')
-        
-        ttk.Label(paths_frame, text="Pasta 'PROGS':", font=('Segoe UI', 9, 'bold')).grid(row=3, column=0, sticky='w', pady=(10,2))
-        ttk.Label(paths_frame, text="(Pasta principal dos programas no cliente/servidor)", style='Instruction.TLabel').grid(row=4, column=0, columnspan=2, sticky='w', pady=(0,5))
-        self.entry_progs = ttk.Entry(paths_frame, textvariable=self.pasta_progs, width=35)
-        self.entry_progs.grid(row=5, column=0, sticky='ew', padx=(0, 5))
-        btn_browse_progs = ttk.Button(paths_frame, text="Procurar...", style='Standard.TButton', command=lambda: self.browse_folder(self.pasta_progs, "PROGS"))
-        btn_browse_progs.grid(row=5, column=1, sticky='e')
-        paths_frame.columnconfigure(0, weight=1)
 
+        ttk.Label(paths_frame, text="Pasta 'PROGS':", font=('Segoe UI', 9, 'bold')).grid(row=0, column=0, sticky='w', pady=(10,2))
+        ttk.Label(paths_frame, text="(Pasta principal dos programas no cliente/servidor)", style='Instruction.TLabel').grid(row=1, column=0, columnspan=2, sticky='w', pady=(0,5))
+        self.entry_progs = ttk.Entry(paths_frame, textvariable=self.pasta_progs, width=35)
+        self.entry_progs.grid(row=2, column=0, sticky='ew', padx=(0, 5))
+        btn_browse_progs = ttk.Button(paths_frame, text="Procurar...", style='Standard.TButton', command=lambda: self.browse_folder(self.pasta_progs, "PROGS"))
+        btn_browse_progs.grid(row=2, column=1, sticky='e')
+        paths_frame.columnconfigure(0, weight=1)
+        
+        ttk.Label(paths_frame, text="Pasta 'Atualizacao':", font=('Segoe UI', 9, 'bold')).grid(row=3, column=0, sticky='w', pady=(0,2))
+        ttk.Label(paths_frame, text="(Contém os arquivos mais recentes para atualizar)", style='Instruction.TLabel').grid(row=4, column=0, columnspan=2, sticky='w', pady=(0,5))
+        self.entry_atualizacao = ttk.Entry(paths_frame, textvariable=self.pasta_atualizacao, width=35)
+        self.entry_atualizacao.grid(row=5, column=0, sticky='ew', padx=(0, 5))
+        btn_browse_atualizacao = ttk.Button(paths_frame, text="Procurar...", style='Standard.TButton', command=lambda: self.browse_folder(self.pasta_atualizacao, "Atualização"))
+        btn_browse_atualizacao.grid(row=5, column=1, sticky='e')
+        
+        
         options_frame = ttk.LabelFrame(left_pane, text="Opções de Atualização", padding="10")
         options_frame.pack(fill='x', pady=(0, 15))
         
@@ -106,11 +107,11 @@ class AutomatedUpdateGUI:
         ttk.Label(options_frame, text="Se marcado, o arquivo existente na pasta PROGS será\nrenomeado (ex: arquivoDDMMAAAA.exe) antes da cópia.", style='Instruction.TLabel').pack(anchor='w', padx=(20,0), pady=(0,5))
 
         self.verbose_var = tk.BooleanVar(value=True) 
-        self.verbose_check = ttk.Checkbutton(options_frame, 
-                                           text="Registrar arquivos com datas idênticas no log", 
-                                           variable=self.verbose_var)
-        self.verbose_check.pack(anchor='w', pady=(5,2))
-        ttk.Label(options_frame, text="Se marcado, informa no log quando os arquivos em 'Atualizacao'\ne 'PROGS' têm a mesma data de modificação.", style='Instruction.TLabel').pack(anchor='w', padx=(20,0), pady=(0,5))
+        # self.verbose_check = ttk.Checkbutton(options_frame, 
+        #                                    text="Registrar arquivos com datas idênticas no log", 
+        #                                    variable=self.verbose_var)
+        # self.verbose_check.pack(anchor='w', pady=(5,2))
+        # ttk.Label(options_frame, text="Se marcado, informa no log quando os arquivos em 'Atualizacao'\ne 'PROGS' têm a mesma data de modificação.", style='Instruction.TLabel').pack(anchor='w', padx=(20,0), pady=(0,5))
 
         action_buttons_frame = ttk.LabelFrame(left_pane, text="Fluxo de Execução Controlado", padding="10")
         action_buttons_frame.pack(fill='x', pady=(0, 15))
