@@ -48,7 +48,7 @@ class AutomatedUpdateGUI:
     def __init__(self, root):
         self.root = root
         self.root.title("Sistema de Atualização Automatizado")
-        self.root.geometry("1100x750")
+        self.root.state('zoomed')
         self.root.configure(bg='#e0e0e0')
 
         # --- State Management ---
