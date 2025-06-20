@@ -15,23 +15,22 @@ class AutomatedUpdateGUI:
         self.root.geometry("1100x750")
         self.root.configure(bg='#e0e0e0')
 
-        # Lista para armazenar pastas a ignorar
+        # --- State Management ---
         self.ignore_list = []
-
-        # Define o caminho para o arquivo de log
+        self.identified_files = []
+        self.planned_actions = []
+        
+        # --- Paths ---
         if getattr(sys, 'frozen', False):
             application_path = os.path.dirname(sys.executable)
         else:
             application_path = os.path.dirname(os.path.abspath(__file__))
         self.log_file_path = os.path.join(application_path, "log.txt")
         
-        # Variáveis para os caminhos
         self.pasta_atualizacao = tk.StringVar(value="Atualizacao")
         self.pasta_progs = tk.StringVar(value="C:\\PROGS")
         
-        self.progs_identified_files = []
-        self.planned_actions_etapa2 = []
-        
+        # --- UI Setup ---
         self.setup_styles()
         self.create_widgets()
         self.center_window()
@@ -61,7 +60,6 @@ class AutomatedUpdateGUI:
         style.configure('Instruction.TLabel', font=('Segoe UI', 8, 'italic'), background='#e0e0e0', foreground='#555')
 
     def create_widgets(self):
-        # Frame principal
         top_frame = ttk.Frame(self.root, padding=(10,5))
         top_frame.pack(fill='x', side='top')
         
@@ -71,14 +69,11 @@ class AutomatedUpdateGUI:
         content_frame = ttk.Frame(self.root)
         content_frame.pack(fill='both', expand=True, padx=10, pady=(0,10))
 
-        left_pane = ttk.Frame(content_frame, width=450, style='TFrame')
-        left_pane.pack(side='left', fill='y', padx=(0, 10))
-        left_pane.pack_propagate(False)
+        left_pane = ttk.Frame(content_frame, style='TFrame')
+        left_pane.pack(side='left', fill='both', expand=True, padx=(0, 5))
 
         right_pane = ttk.Frame(content_frame, style='TFrame')
-        right_pane.pack(side='right', fill='both', expand=True)
-
-        # --- Widgets do Painel da Esquerda ---
+        right_pane.pack(side='right', fill='both', expand=True, padx=(5, 0))
         
         paths_frame = ttk.LabelFrame(left_pane, text="Pastas de Entrada", padding="10")
         paths_frame.pack(fill='x', pady=(0, 10), anchor='n')
@@ -98,7 +93,6 @@ class AutomatedUpdateGUI:
         btn_browse_atualizacao.grid(row=5, column=1, sticky='e')
         paths_frame.columnconfigure(0, weight=1)
 
-        # Seção de Pastas a Ignorar
         ignore_frame = ttk.LabelFrame(left_pane, text="Pastas a Ignorar", padding="10")
         ignore_frame.pack(fill='x', pady=(0, 10), anchor='n')
         
@@ -107,7 +101,7 @@ class AutomatedUpdateGUI:
         listbox_frame = ttk.Frame(ignore_frame)
         listbox_frame.pack(fill='x', expand=True)
 
-        self.ignore_listbox = tk.Listbox(listbox_frame, height=4, font=('Segoe UI', 9), selectmode=tk.EXTENDED)
+        self.ignore_listbox = tk.Listbox(listbox_frame, height=3, font=('Segoe UI', 9), selectmode=tk.EXTENDED)
         self.ignore_listbox.pack(side='left', fill='x', expand=True)
 
         scrollbar = ttk.Scrollbar(listbox_frame, orient='vertical', command=self.ignore_listbox.yview)
@@ -120,27 +114,29 @@ class AutomatedUpdateGUI:
         btn_add_ignore = ttk.Button(ignore_buttons_frame, text="Adicionar", style='Small.TButton', command=self.add_ignore_folder)
         btn_add_ignore.pack(side='left', expand=True, fill='x', padx=(0,2))
         
-        btn_remove_ignore = ttk.Button(ignore_buttons_frame, text="Remover Selecionada", style='Small.TButton', command=self.remove_ignore_folder)
+        btn_remove_ignore = ttk.Button(ignore_buttons_frame, text="Remover", style='Small.TButton', command=self.remove_ignore_folder)
         btn_remove_ignore.pack(side='left', expand=True, fill='x', padx=(2,0))
         
         options_frame = ttk.LabelFrame(left_pane, text="Opções de Atualização", padding="10")
         options_frame.pack(fill='x', pady=(0, 10), anchor='n')
         
         self.backup_var = tk.BooleanVar(value=True)
-        self.create_backup_check = ttk.Checkbutton(options_frame, text="Backup automático antes de sobrescrever arquivos", variable=self.backup_var)
+        self.create_backup_check = ttk.Checkbutton(options_frame, text="Backup antes de sobrescrever arquivos", variable=self.backup_var)
         self.create_backup_check.pack(anchor='w', pady=(0,2))
-        ttk.Label(options_frame, text="Se marcado, o arquivo existente será renomeado (ex: arquivoDDMMAAAA.exe).", style='Instruction.TLabel').pack(anchor='w', padx=(20,0), pady=(0,5))
+        ttk.Label(options_frame, text="Renomeia o arquivo atual em PROGS para 'arquivoDDMMAAAA' antes de copiar o novo.", style='Instruction.TLabel').pack(anchor='w', padx=(20,0), pady=(0,5))
 
         action_buttons_frame = ttk.LabelFrame(left_pane, text="Fluxo de Execução Controlado", padding="10")
         action_buttons_frame.pack(fill='both', expand=True, pady=(0, 10), anchor='n')
 
-        self.btn_etapa1 = ttk.Button(action_buttons_frame, text="Etapa 1 – Identificar Arquivos", style='Main.TButton', command=self.start_etapa1_identification)
-        self.btn_etapa1.pack(fill='x', pady=5)
+        self.btn_step1 = ttk.Button(action_buttons_frame, text="Etapa 1 - Identificar Arquivos", style='Main.TButton', command=self.start_step1_identification)
+        self.btn_step1.pack(fill='x', pady=5)
         
-        self.btn_etapa2 = ttk.Button(action_buttons_frame, text="Etapa 2 – Comparar e Atualizar", style='Critical.TButton', command=self.start_etapa2_update, state='disabled')
-        self.btn_etapa2.pack(fill='x', pady=5)
+        self.btn_step2 = ttk.Button(action_buttons_frame, text="Etapa 2 - Comparar Arquivos", style='Main.TButton', command=self.start_step2_comparison, state='disabled')
+        self.btn_step2.pack(fill='x', pady=5)
 
-        # Bottom controls
+        self.btn_step3 = ttk.Button(action_buttons_frame, text="Etapa 3 - Executar Atualização", style='Critical.TButton', command=self.start_step3_execution, state='disabled')
+        self.btn_step3.pack(fill='x', pady=5)
+
         bottom_frame = ttk.Frame(left_pane)
         bottom_frame.pack(fill='x', side='bottom', pady=(10,0))
         
@@ -163,7 +159,6 @@ class AutomatedUpdateGUI:
         self.btn_finalize = ttk.Button(control_buttons_frame, text="Finalizar", style='Standard.TButton', command=self.root.destroy)
         self.btn_finalize.pack(side='right')
         
-        # --- Painel da Direita (Log) ---
         log_frame_outer = ttk.LabelFrame(right_pane, text="Log Detalhado de Operações", padding="10")
         log_frame_outer.pack(fill='both', expand=True)
         
@@ -188,8 +183,7 @@ class AutomatedUpdateGUI:
 
     def browse_folder(self, var, folder_name):
         folder = filedialog.askdirectory(title=f"Selecione a Pasta '{folder_name}'")
-        if not folder:
-            return
+        if not folder: return
 
         normalized_folder = os.path.normpath(folder)
         var.set(normalized_folder)
@@ -197,11 +191,10 @@ class AutomatedUpdateGUI:
         
         if folder_name == "Atualização":
             progs_path = os.path.normpath(self.pasta_progs.get())
-            if os.path.commonpath([progs_path, normalized_folder]) == progs_path:
-                if normalized_folder not in self.ignore_list:
-                    self.ignore_list.append(normalized_folder)
-                    self.update_ignore_listbox()
-                    self.log_message(f"Pasta 'Atualizacao' está dentro de 'PROGS' e foi adicionada à lista de ignorados.", 'warning')
+            if os.path.commonpath([progs_path, normalized_folder]) == progs_path and normalized_folder not in self.ignore_list:
+                self.ignore_list.append(normalized_folder)
+                self.update_ignore_listbox()
+                self.log_message(f"Pasta 'Atualizacao' está dentro de 'PROGS' e foi adicionada à lista de ignorados.", 'warning')
 
     def add_ignore_folder(self):
         folder = filedialog.askdirectory(title="Selecione uma pasta para ignorar")
@@ -211,19 +204,14 @@ class AutomatedUpdateGUI:
                 self.ignore_list.append(normalized_folder)
                 self.update_ignore_listbox()
                 self.log_message(f"Pasta adicionada à lista de ignorados: {normalized_folder}", 'info')
-            else:
-                self.log_message(f"A pasta '{normalized_folder}' já está na lista de ignorados.", 'detail')
 
     def remove_ignore_folder(self):
         selected_indices = self.ignore_listbox.curselection()
         if not selected_indices:
-            messagebox.showinfo("Nenhuma Seleção", "Por favor, selecione uma ou mais pastas para remover.")
+            messagebox.showinfo("Nenhuma Seleção", "Por favor, selecione uma pasta para remover.")
             return
-
         for index in sorted(selected_indices, reverse=True):
-            removed_folder = self.ignore_list.pop(index)
-            self.log_message(f"Pasta removida da lista de ignorados: {removed_folder}", 'info')
-        
+            self.ignore_list.pop(index)
         self.update_ignore_listbox()
 
     def update_ignore_listbox(self):
@@ -233,20 +221,14 @@ class AutomatedUpdateGUI:
 
     def log_message(self, message, tag='info'):
         timestamp = datetime.now().strftime('%d/%m/%Y %H:%M:%S')
-        formatted_message_gui = message.replace("\n", "\n" + " " * (len(timestamp) + 3))
-        full_message_for_gui = f"[{timestamp}] {formatted_message_gui}\n"
-        
+        full_message_for_gui = f"[{timestamp}] {message.replace(os.linesep, f'{os.linesep}[{timestamp}] ')}\n"
         self.log_text.insert(tk.END, full_message_for_gui, tag)
         self.log_text.see(tk.END)
-        
-        full_message_for_file = f"[{timestamp}] {message}\n"
         try:
             with open(self.log_file_path, 'a', encoding='utf-8') as f_log:
-                f_log.write(full_message_for_file)
+                f_log.write(f"[{timestamp}] {message}\n")
         except Exception as e:
-            gui_error_msg = f"[{timestamp}] !!! CRITICAL: Falha ao escrever no arquivo de log ({self.log_file_path}): {e} !!!\n"
-            self.log_text.insert(tk.END, gui_error_msg, 'error')
-            self.log_text.see(tk.END)
+            self.log_text.insert(tk.END, f"[{timestamp}] !!! CRITICAL: Falha ao escrever no arquivo de log: {e} !!!\n", 'error')
         self.root.update_idletasks()
 
     def clear_log(self):
@@ -254,248 +236,158 @@ class AutomatedUpdateGUI:
             self.log_text.delete(1.0, tk.END)
             self.log_message("Log da tela limpo pelo usuário.", "info")
 
-    def validate_paths_and_prepare(self):
-        pasta_atualizacao_val = os.path.normpath(self.pasta_atualizacao.get().strip())
-        pasta_progs_val = os.path.normpath(self.pasta_progs.get().strip())
-        
-        if not pasta_atualizacao_val or not pasta_progs_val:
-            messagebox.showerror("Erro de Validação", "Informe os caminhos para 'Atualizacao' e 'PROGS'.")
-            return False
-        if not os.path.exists(pasta_atualizacao_val):
-            messagebox.showerror("Erro de Validação", f"Pasta 'Atualizacao' não encontrada:\n{pasta_atualizacao_val}")
-            return False
-        if not os.path.exists(pasta_progs_val):
-            messagebox.showerror("Erro de Validação", f"Pasta 'PROGS' não encontrada:\n{pasta_progs_val}")
+    def validate_paths(self):
+        if not all(os.path.exists(p) for p in [self.pasta_progs.get(), self.pasta_atualizacao.get()]):
+            messagebox.showerror("Erro de Validação", "Um ou mais caminhos de pasta são inválidos.")
             return False
         return True
 
-    def set_buttons_state_during_operation(self, is_operating):
+    def toggle_ui_state(self, is_operating):
         state = 'disabled' if is_operating else 'normal'
-        self.btn_etapa1.config(state=state)
+        self.btn_step1.config(state=state)
+        # Sequencialmente habilita os botões
+        self.btn_step2.config(state='disabled' if is_operating or not self.identified_files else 'normal')
+        self.btn_step3.config(state='disabled' if is_operating or not self.planned_actions else 'normal')
         
-        if not is_operating and self.progs_identified_files:
-             self.btn_etapa2.config(state='normal')
-        else:
-             self.btn_etapa2.config(state='disabled')
-        
-        self.btn_clear_log.config(state=state)
-        self.btn_finalize.config(state=state)
-        self.ignore_listbox.config(state=state)
+        for child in (self.root.winfo_children()):
+             if isinstance(child, (ttk.Frame, ttk.LabelFrame)):
+                for widget in child.winfo_children():
+                    if isinstance(widget, (ttk.Button, ttk.Entry, tk.Listbox, ttk.Checkbutton)) and widget not in [self.btn_step1, self.btn_step2, self.btn_step3, self.btn_finalize]:
+                        widget.config(state=state)
 
-    def start_etapa1_identification(self):
-        if not self.validate_paths_and_prepare():
-            return
-        
-        self.progs_identified_files = []
-        self.planned_actions_etapa2 = []
-        self.set_buttons_state_during_operation(True)
+    # --- ETAPA 1: IDENTIFICATION ---
+    def start_step1_identification(self):
+        if not self.validate_paths(): return
+        self.identified_files.clear()
+        self.planned_actions.clear()
+        self.toggle_ui_state(True)
         self.progress_bar.start()
         self.status_var.set("Etapa 1: Identificando arquivos em PROGS...")
-        
-        thread = threading.Thread(target=self.run_etapa1_identification_logic, daemon=True)
-        thread.start()
+        threading.Thread(target=self._run_step1_identification, daemon=True).start()
 
-    def run_etapa1_identification_logic(self):
+    def _run_step1_identification(self):
         try:
-            self.log_message("INICIANDO ETAPA 1: IDENTIFICAÇÃO DE ARQUIVOS", 'header')
+            self.log_message("--- INICIANDO ETAPA 1: IDENTIFICAÇÃO DE ARQUIVOS ---", 'header')
             path_progs_str = os.path.normpath(self.pasta_progs.get())
-            self.log_message(f"Buscando em: {path_progs_str}", 'info')
-            
             normalized_ignore_list = [os.path.normpath(p) for p in self.ignore_list]
-            if normalized_ignore_list:
-                self.log_message("Pastas a ignorar na verificação:", 'info')
-                for p in normalized_ignore_list:
-                    self.log_message(f" - {p}", 'detail')
-
-            file_count = 0
+            
             for root, dirs, files in os.walk(path_progs_str, topdown=True):
-                normalized_root = os.path.normpath(root)
-                is_ignored = any(normalized_root.startswith(ignore_path) for ignore_path in normalized_ignore_list)
-                if is_ignored:
+                if any(os.path.normpath(root).startswith(p) for p in normalized_ignore_list):
                     dirs[:] = []
                     continue
-
                 for filename in files:
                     if filename.lower().endswith(('.exe', '.dll')):
-                        full_path = os.path.join(root, filename)
-                        self.progs_identified_files.append(os.path.abspath(full_path))
-                        file_count += 1
+                        self.identified_files.append(os.path.join(root, filename))
             
-            self.log_message(f"Total de arquivos (.exe, .dll) encontrados: {file_count}", 'info')
-            self.log_message("ETAPA 1 CONCLUÍDA", 'success')
-            
-            if not self.progs_identified_files:
-                self.status_var.set("Etapa 1: Nenhum arquivo encontrado.")
-            else:
-                self.status_var.set(f"Etapa 1: {file_count} arquivo(s) identificado(s).")
-
+            self.log_message(f"Etapa 1 concluída. Total de arquivos encontrados: {len(self.identified_files)}", 'success')
+            self.status_var.set(f"Etapa 1 concluída. {len(self.identified_files)} arquivo(s) pronto(s) para comparação.")
         except Exception as e:
             self.log_message(f"Erro na Etapa 1: {e}", 'error')
             self.status_var.set("Erro na Etapa 1.")
         finally:
             self.progress_bar.stop()
-            self.set_buttons_state_during_operation(False)
-            
-    def start_etapa2_update(self):
-        if not self.progs_identified_files:
+            self.toggle_ui_state(False)
+
+    # --- ETAPA 2: COMPARISON ---
+    def start_step2_comparison(self):
+        if not self.identified_files:
             messagebox.showwarning("Aviso", "Execute a Etapa 1 primeiro.")
             return
-        if not self.validate_paths_and_prepare():
+        self.planned_actions.clear()
+        self.toggle_ui_state(True)
+        self.progress_bar.start()
+        self.status_var.set("Etapa 2: Comparando arquivos...")
+        threading.Thread(target=self._run_step2_comparison, daemon=True).start()
+
+    def _run_step2_comparison(self):
+        try:
+            self.log_message("--- INICIANDO ETAPA 2: COMPARAÇÃO DE ARQUIVOS ---", 'header')
+            base_progs = Path(self.pasta_progs.get())
+            base_atualizacao = Path(self.pasta_atualizacao.get())
+            
+            for file_str in self.identified_files:
+                progs_path = Path(file_str)
+                try:
+                    relative_path = progs_path.relative_to(base_progs)
+                    atualizacao_path = base_atualizacao / relative_path
+                    if atualizacao_path.exists() and atualizacao_path.stat().st_mtime > progs_path.stat().st_mtime:
+                        self.planned_actions.append({'source': str(atualizacao_path), 'dest': str(progs_path)})
+                        self.log_message(f"-> Planejada atualização para: {progs_path.name}", 'warning')
+                except ValueError:
+                    self.log_message(f"ERRO: {progs_path} não está em {base_progs}.", "error")
+
+            if not self.planned_actions:
+                self.log_message("Etapa 2 concluída. Nenhum arquivo precisa ser atualizado.", 'success')
+                self.status_var.set("Etapa 2 concluída. Nenhum arquivo para atualizar.")
+            else:
+                self.log_message(f"Etapa 2 concluída. Total de arquivos para atualizar: {len(self.planned_actions)}", 'success')
+                self.status_var.set(f"Etapa 2 concluída. {len(self.planned_actions)} arquivo(s) pronto(s) para atualização.")
+        except Exception as e:
+            self.log_message(f"Erro na Etapa 2: {e}", 'error')
+            self.status_var.set("Erro na Etapa 2.")
+        finally:
+            self.progress_bar.stop()
+            self.toggle_ui_state(False)
+
+    # --- ETAPA 3: EXECUTION ---
+    def start_step3_execution(self):
+        if not self.planned_actions:
+            messagebox.showwarning("Aviso", "Nenhuma atualização planejada. Execute a Etapa 2 primeiro.")
             return
 
-        self.set_buttons_state_during_operation(True)
+        confirm_msg = f"{len(self.planned_actions)} arquivo(s) serão atualizados.\nEsta operação é crítica e modifica arquivos.\n\nDeseja continuar?"
+        if not messagebox.askyesno("Confirmação Crítica", confirm_msg, icon='warning'):
+            self.log_message("Atualização cancelada pelo usuário.", 'warning')
+            return
+            
+        self.toggle_ui_state(True)
         self.progress_bar.start()
-        self.status_var.set("Etapa 2: Analisando arquivos para atualização...")
-        self.planned_actions_etapa2 = []
+        self.status_var.set("Etapa 3: Executando atualizações...")
+        threading.Thread(target=self._run_step3_execution, daemon=True).start()
 
-        thread = threading.Thread(target=self.run_etapa2_analysis_phase, daemon=True)
-        thread.start()
-     
-    def run_etapa2_analysis_phase(self):
-        try:
-            self.log_message("INICIANDO ETAPA 2 (ANÁLISE)", 'header')
-            base_progs_path = Path(self.pasta_progs.get())
-            base_atualizacao_path = Path(self.pasta_atualizacao.get())
-            
-            for progs_file_str in self.progs_identified_files:
-                progs_file_path = Path(progs_file_str)
-                try:
-                    relative_path = progs_file_path.relative_to(base_progs_path)
-                except ValueError:
-                    self.log_message(f"ERRO INTERNO: {progs_file_path} não está em {base_progs_path}.", "error")
-                    continue
-
-                atualizacao_file_path = base_atualizacao_path / relative_path
-                
-                if not atualizacao_file_path.exists():
-                    continue
-
-                mtime_progs = progs_file_path.stat().st_mtime
-                mtime_atualizacao = atualizacao_file_path.stat().st_mtime
-                
-                if mtime_atualizacao > mtime_progs:
-                    action_details = {
-                        'progs_file_path_str': str(progs_file_path),
-                        'atualizacao_file_path_str': str(atualizacao_file_path),
-                        'target_dir_str': str(progs_file_path.parent),
-                        'original_filename': progs_file_path.name,
-                        'base_name': progs_file_path.stem,
-                        'extension': progs_file_path.suffix,
-                    }
-                    self.planned_actions_etapa2.append(action_details)
-                    self.log_message(f"-> ATUALIZAÇÃO NECESSÁRIA para '{progs_file_path.name}'.", 'warning')
-
-            if not self.planned_actions_etapa2:
-                self.log_message("Nenhum arquivo precisa ser atualizado.", "info")
-                self.status_var.set("Etapa 2: Nenhum arquivo para atualizar.")
-            else:
-                self.log_message(f"Total de arquivos para atualizar: {len(self.planned_actions_etapa2)}", 'critical')
-                self.status_var.set("Etapa 2: Análise concluída. Aguardando confirmação.")
-                self.root.after(0, self._request_update_confirmation_dialog)
-
-        except Exception as e:
-            self.log_message(f"Erro na análise da Etapa 2: {e}", 'error')
-            self.status_var.set("Erro na análise da Etapa 2.")
-        finally:
-            if not self.planned_actions_etapa2:
-                self.progress_bar.stop()
-                self.set_buttons_state_during_operation(False)
-
-    def _request_update_confirmation_dialog(self):
-        num_updates = len(self.planned_actions_etapa2)
-        confirm_msg = f"CONFIRMAÇÃO NECESSÁRIA\n\n{num_updates} arquivo(s) serão atualizados.\n\nO processo irá:\n"
-        confirm_msg += "1. Remover arquivos antigos (com sufixos de data ou prefixo 'old_').\n"
-        if self.backup_var.get():
-            confirm_msg += "2. Renomear os arquivos atuais como backup.\n"
-            confirm_msg += "3. Copiar os arquivos novos da 'Atualizacao' para 'PROGS'.\n"
-        else:
-            confirm_msg += "2. Copiar os arquivos novos (SOBRESCREVENDO SEM BACKUP).\n"
-        confirm_msg += "\nEsta operação é crítica. Verifique o log. Deseja continuar?"
+    def _run_step3_execution(self):
+        self.log_message("--- INICIANDO ETAPA 3: EXECUÇÃO DA ATUALIZAÇÃO ---", 'header')
+        updated_count, error_count = 0, 0
         
-        if messagebox.askyesno("Confirmação Crítica", confirm_msg, icon='warning'):
-            self.log_message("CONFIRMAÇÃO DO USUÁRIO: Atualização autorizada.", 'critical')
-            execution_thread = threading.Thread(target=self.run_etapa2_execution_phase, daemon=True)
-            execution_thread.start()
-        else:
-            self.log_message("ATUALIZAÇÃO CANCELADA PELO USUÁRIO.", 'warning')
-            self.status_var.set("Etapa 2: Atualização cancelada.")
-            self.progress_bar.stop()
-            self.set_buttons_state_during_operation(False)
-
-    def run_etapa2_execution_phase(self):
-        try:
-            self.log_message("INICIANDO ETAPA 2 (EXECUÇÃO)", 'header')
-            updated_count = 0
-            error_count = 0
-
-            for action in self.planned_actions_etapa2:
-                original_filename = action['original_filename']
-                target_dir = Path(action['target_dir_str'])
-                self.log_message(f"Processando: '{original_filename}' em '{target_dir}'", 'info')
-                
-                try:
-                    # Passo 1: Remover arquivos legados
-                    self._remove_legacy_files_step_6_1(target_dir, action['base_name'], action['extension'])
-
-                    # Passo 2: Backup (se habilitado)
-                    progs_file_path = Path(action['progs_file_path_str'])
-                    if self.backup_var.get() and progs_file_path.exists():
-                        self._backup_file_with_date_step_6_2(progs_file_path)
-
-                    # Passo 3: Copiar o novo arquivo
-                    atualizacao_file_path = Path(action['atualizacao_file_path_str'])
-                    shutil.copy2(str(atualizacao_file_path), str(progs_file_path))
-                    self.log_message(f" -> SUCESSO: '{original_filename}' atualizado.", 'success')
-                    updated_count += 1
-
-                except Exception as file_op_error:
-                    error_count += 1
-                    self.log_message(f" -> ERRO AO ATUALIZAR '{original_filename}': {file_op_error}", 'error')
+        for action in self.planned_actions:
+            dest_path = Path(action['dest'])
+            source_path = Path(action['source'])
             
-            summary_msg = f"Finalizado!\n\n✅ Sucessos: {updated_count}\n❌ Erros: {error_count}"
-            self.root.after(0, lambda: messagebox.showinfo("Resumo da Atualização", summary_msg))
+            try:
+                self.log_message(f"Processando: '{dest_path.name}'", 'info')
+                self._remove_legacy_files(dest_path.parent, dest_path.stem, dest_path.suffix)
+                if self.backup_var.get() and dest_path.exists():
+                    self._backup_current_file(dest_path)
+                shutil.copy2(str(source_path), str(dest_path))
+                self.log_message(f" -> SUCESSO: '{dest_path.name}' atualizado.", 'success')
+                updated_count += 1
+            except Exception as e:
+                self.log_message(f" -> ERRO AO ATUALIZAR '{dest_path.name}': {e}", 'error')
+                error_count += 1
+        
+        summary_msg = f"Processo finalizado!\n\n✅ Sucessos: {updated_count}\n❌ Erros: {error_count}"
+        self.log_message(summary_msg, 'success' if error_count == 0 else 'warning')
+        self.status_var.set(f"Etapa 3 concluída. Sucessos: {updated_count}, Erros: {error_count}")
+        self.root.after(0, lambda: messagebox.showinfo("Resumo da Atualização", summary_msg))
+        
+        self.progress_bar.stop()
+        self.planned_actions.clear() # Limpa as ações após execução
+        self.toggle_ui_state(False)
 
-        except Exception as e:
-            self.log_message(f"Erro crítico na execução da Etapa 2: {e}", 'error')
-        finally:
-            self.status_var.set(f"Etapa 2: Concluída. {updated_count} atualizado(s), {error_count} erro(s).")
-            self.progress_bar.stop()
-            self.set_buttons_state_during_operation(False)
-            self.planned_actions_etapa2 = []
-
-    def _remove_legacy_files_step_6_1(self, target_dir: Path, base_name: str, extension: str):
-        """
-        Remove de forma abrangente arquivos legados baseados no nome do arquivo original.
-        """
-        # Padrão para arquivos com prefixo 'old_', comum em backups manuais.
+    def _remove_legacy_files(self, target_dir: Path, base_name: str, extension: str):
         prefix_pattern = re.compile(rf"^old_{re.escape(base_name)}.*", re.IGNORECASE)
-        
         original_filename_lower = (base_name + extension).lower()
         base_name_lower = base_name.lower()
 
         for item in target_dir.iterdir():
-            # Processa apenas arquivos com a mesma extensão.
             if item.is_file() and item.suffix.lower() == extension.lower():
-                item_name_lower = item.name.lower()
-                item_stem_lower = item.stem.lower()
-
-                # Pula o arquivo original exato que será atualizado.
-                if item_name_lower == original_filename_lower:
-                    continue
+                if item.name.lower() == original_filename_lower: continue
 
                 should_remove = False
-                
-                # Condição 1: Verifica o padrão de prefixo "old_".
                 if prefix_pattern.match(item.stem):
                     should_remove = True
-                
-                # Condição 2: Verifica se o nome do arquivo começa com o nome base, mas é mais longo.
-                elif item_stem_lower.startswith(base_name_lower) and len(item_stem_lower) > len(base_name_lower):
-                    # Pega o caractere logo após o nome base.
-                    char_after_basename = item_stem_lower[len(base_name_lower)]
-                    # Se não for uma letra, consideramos um arquivo legado (ex: "Nome_123", "Nome - Copia").
-                    # Isso evita remover arquivos como "NomeHelper.exe".
-                    if not char_after_basename.isalpha():
+                elif item.stem.lower().startswith(base_name_lower) and len(item.stem) > len(base_name):
+                    if not item.stem[len(base_name)].isalpha():
                         should_remove = True
 
                 if should_remove:
@@ -505,30 +397,29 @@ class AutomatedUpdateGUI:
                     except Exception as e:
                         self.log_message(f"   ERRO ao remover legado '{item.name}': {e}", 'error')
 
-    def _backup_file_with_date_step_6_2(self, progs_file_path: Path):
-        dir, base, ext = progs_file_path.parent, progs_file_path.stem, progs_file_path.suffix
+    def _backup_current_file(self, file_path: Path):
         date_str = datetime.now().strftime('%d%m%Y')
-        backup_name = f"{base}{date_str}{ext}"
-        backup_path = dir / backup_name
+        backup_name = f"{file_path.stem}{date_str}{file_path.suffix}"
+        backup_path = file_path.parent / backup_name
         
         counter = 1
         while backup_path.exists():
-            backup_name = f"{base}{date_str}_{counter}{ext}"
-            backup_path = dir / backup_name
+            backup_name = f"{file_path.stem}{date_str}_{counter}{file_path.suffix}"
+            backup_path = file_path.parent / backup_name
             counter += 1
         
         try:
-            progs_file_path.rename(backup_path)
-            self.log_message(f"   Backup criado: '{progs_file_path.name}' -> '{backup_path.name}'", 'detail')
+            file_path.rename(backup_path)
+            self.log_message(f"   Backup criado: '{file_path.name}' -> '{backup_path.name}'", 'detail')
         except Exception as e:
-            self.log_message(f"   ERRO ao criar backup para '{progs_file_path.name}': {e}", 'error')
+            self.log_message(f"   ERRO ao criar backup para '{file_path.name}': {e}", 'error')
             raise
 
 def resource_path(relative_path):
     try:
         base_path = sys._MEIPASS
     except AttributeError:
-        base_path = os.path.dirname(os.path.abspath(__file__))
+        base_path = os.path.abspath(".")
     return os.path.join(base_path, relative_path)
 
 def main():
@@ -537,13 +428,10 @@ def main():
         icon_path = resource_path("icon.ico")
         if os.path.exists(icon_path):
             root.iconbitmap(default=icon_path)
-    except Exception:
-        pass
+    except Exception: pass
     if os.name == 'nt':
-        try:
-            ttk.Style().theme_use('vista')
-        except tk.TclError:
-            pass
+        try: ttk.Style().theme_use('vista')
+        except tk.TclError: pass
     app = AutomatedUpdateGUI(root)
     root.mainloop()
 
