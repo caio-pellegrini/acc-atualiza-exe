@@ -8,6 +8,42 @@ import threading
 import re
 import sys
 
+# --- NOVA CLASSE: ToolTip ---
+# Classe auxiliar para criar dicas de ferramenta (tooltips) que aparecem ao passar o mouse.
+class ToolTip:
+    def __init__(self, widget, text):
+        self.widget = widget
+        self.text = text
+        self.tooltip_window = None
+        self.widget.bind("<Enter>", self.enter)
+        self.widget.bind("<Leave>", self.leave)
+
+    def enter(self, event=None):
+        """Cria e exibe a janela da dica de ferramenta."""
+        x, y, _, _ = self.widget.bbox("insert")
+        x += self.widget.winfo_rootx() + 25
+        y += self.widget.winfo_rooty() + 20
+
+        # Cria uma janela Toplevel
+        self.tooltip_window = tk.Toplevel(self.widget)
+        
+        # Remove a borda e a barra de título da janela
+        self.tooltip_window.wm_overrideredirect(True)
+        self.tooltip_window.wm_geometry(f"+{x}+{y}")
+        
+        label = tk.Label(self.tooltip_window, text=self.text, justify='left',
+                         background="#ffffe0", relief='solid', borderwidth=1,
+                         font=("tahoma", "8", "normal"))
+        label.pack(ipadx=1)
+
+    def leave(self, event=None):
+        """Destrói a janela da dica de ferramenta."""
+        if self.tooltip_window:
+            self.tooltip_window.destroy()
+        self.tooltip_window = None
+# --- FIM DA CLASSE ToolTip ---
+
+
 class AutomatedUpdateGUI:
     def __init__(self, root):
         self.root = root
@@ -79,24 +115,20 @@ class AutomatedUpdateGUI:
         paths_frame.pack(fill='x', pady=(0, 10), anchor='n')
 
         ttk.Label(paths_frame, text="Pasta 'PROGS':", font=('Segoe UI', 9, 'bold')).grid(row=0, column=0, sticky='w', pady=(5,2))
-        ttk.Label(paths_frame, text="(Pasta principal dos programas no cliente/servidor)", style='Instruction.TLabel').grid(row=1, column=0, columnspan=2, sticky='w', pady=(0,5))
         self.entry_progs = ttk.Entry(paths_frame, textvariable=self.pasta_progs, width=35)
-        self.entry_progs.grid(row=2, column=0, sticky='ew', padx=(0, 5))
+        self.entry_progs.grid(row=1, column=0, sticky='ew', padx=(0, 5))
         btn_browse_progs = ttk.Button(paths_frame, text="Procurar...", style='Standard.TButton', command=lambda: self.browse_folder(self.pasta_progs, "PROGS"))
-        btn_browse_progs.grid(row=2, column=1, sticky='e')
+        btn_browse_progs.grid(row=1, column=1, sticky='e')
         
-        ttk.Label(paths_frame, text="Pasta 'Atualizacao':", font=('Segoe UI', 9, 'bold')).grid(row=3, column=0, sticky='w', pady=(5,2))
-        ttk.Label(paths_frame, text="(Contém os arquivos mais recentes para atualizar)", style='Instruction.TLabel').grid(row=4, column=0, columnspan=2, sticky='w', pady=(0,5))
+        ttk.Label(paths_frame, text="Pasta 'Atualizacao':", font=('Segoe UI', 9, 'bold')).grid(row=2, column=0, sticky='w', pady=(5,2))
         self.entry_atualizacao = ttk.Entry(paths_frame, textvariable=self.pasta_atualizacao, width=35)
-        self.entry_atualizacao.grid(row=5, column=0, sticky='ew', padx=(0, 5))
+        self.entry_atualizacao.grid(row=3, column=0, sticky='ew', padx=(0, 5))
         btn_browse_atualizacao = ttk.Button(paths_frame, text="Procurar...", style='Standard.TButton', command=lambda: self.browse_folder(self.pasta_atualizacao, "Atualização"))
-        btn_browse_atualizacao.grid(row=5, column=1, sticky='e')
+        btn_browse_atualizacao.grid(row=3, column=1, sticky='e')
         paths_frame.columnconfigure(0, weight=1)
 
         ignore_frame = ttk.LabelFrame(left_pane, text="Pastas a Ignorar", padding="10")
         ignore_frame.pack(fill='x', pady=(0, 10), anchor='n')
-        
-        ttk.Label(ignore_frame, text="Pastas listadas aqui não serão analisadas nem atualizadas.", style='Instruction.TLabel').pack(anchor='w', pady=(0,5))
         
         listbox_frame = ttk.Frame(ignore_frame)
         listbox_frame.pack(fill='x', expand=True)
@@ -122,13 +154,13 @@ class AutomatedUpdateGUI:
         
         self.backup_var = tk.BooleanVar(value=True)
         self.create_backup_check = ttk.Checkbutton(options_frame, text="Criar backup automático", variable=self.backup_var)
-        self.create_backup_check.pack(anchor='w', pady=(0,2))
+        self.create_backup_check.pack(anchor='w', pady=(2,2))
+        ToolTip(self.create_backup_check, "Se marcado, renomeia o arquivo existente na pasta PROGS\n(ex: arquivo_19062025.exe) para criar um backup\nantes de copiar a nova versão.")
         
-        # --- NOVO: Checkbox para Log Verboso ---
         self.verbose_var = tk.BooleanVar(value=True)
         self.verbose_check = ttk.Checkbutton(options_frame, text="Log Detalhado (Verboso)", variable=self.verbose_var)
-        self.verbose_check.pack(anchor='w', pady=(5,2))
-
+        self.verbose_check.pack(anchor='w', pady=(2,2))
+        ToolTip(self.verbose_check, "Se marcado, exibe no log informações detalhadas de cada etapa,\ncomo a lista completa de arquivos encontrados e as datas de\nmodificação durante a comparação.")
 
         action_buttons_frame = ttk.LabelFrame(left_pane, text="Fluxo de Execução Controlado", padding="10")
         action_buttons_frame.pack(fill='x', pady=(0, 10), anchor='n')
@@ -254,20 +286,20 @@ class AutomatedUpdateGUI:
     def toggle_ui_state(self, is_operating):
         state = 'disabled' if is_operating else 'normal'
         
-        # Control main action buttons
         self.btn_step1.config(state=state)
         self.btn_step2.config(state='disabled' if is_operating or not self.identified_files else 'normal')
         self.btn_step3.config(state='disabled' if is_operating or not self.planned_actions else 'normal')
         
-        # Control other interactive widgets
         for widget in [self.entry_progs, self.entry_atualizacao, self.ignore_listbox, self.create_backup_check, self.verbose_check]:
             widget.config(state=state)
         
-        # Find all buttons in frames and disable them, except for the main flow
-        for frame in [self.root, self.entry_progs.master, self.ignore_listbox.master.master]:
-            for child in frame.winfo_children():
-                if isinstance(child, ttk.Button) and child not in [self.btn_step1, self.btn_step2, self.btn_step3, self.btn_finalize, self.btn_clear_log]:
-                     child.config(state=state)
+        # Iterar sobre os botões "Procurar...", "Adicionar", "Remover" para desabilitá-los.
+        # Isto é uma abordagem mais robusta do que depender da estrutura dos frames.
+        for w_info in self.root.winfo_children():
+            for w in w_info.winfo_children():
+                 if isinstance(w, (ttk.Button, ttk.Entry, tk.Listbox, ttk.Checkbutton)):
+                    if w not in [self.btn_step1, self.btn_step2, self.btn_step3, self.btn_finalize, self.btn_clear_log]:
+                        w.config(state=state)
 
 
     # --- ETAPA 1: IDENTIFICATION ---
